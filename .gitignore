@@ -1,0 +1,10 @@
+bin/
+obj/
+*.pdb
+*.oudep
+*.onnx
+*.user
+.vs/
+.vscode/
+__pycache__/
+DS_nofabet/
