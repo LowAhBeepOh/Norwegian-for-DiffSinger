@@ -39,7 +39,7 @@ Tested with OpenUtau 0.1.569-beta, which ships ONNX Runtime 1.23.0. The plugin i
    ```yaml
    default_phonemizer: OpenUtau.Core.DiffSinger.DiffSingerNorwegianPhonemizer
    ```
-   Or select `DiffSinger Norwegian Phonemizer` in the singer settings.
+   Or select `DiffSinger Norwegian Phonemizer` in the singer settings. **Skip changing the phonemizer if you have multiple languages in your voicebank.**
 3. The voicebank’s `phonemes.json` is written during export, describes the phones the model was actually trained on, and must never be edited. Your dictionary has to produce phones that appear in that file. If the model was trained on a different set (for example, with stress digits like `no/AA0`), keep `phonemes.json` as it is and map the phones with `replacements` in your own dictionary. Train on the right Norwegian data before exporting, because a wrong `phonemes.json` can’t be fixed afterwards.
 
 ## File Structure for your Voicebank
