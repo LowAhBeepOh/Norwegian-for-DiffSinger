@@ -8,3 +8,16 @@ obj/
 .vscode/
 __pycache__/
 DS_nofabet/
+
+.nofa_tools/
+
+# Python / GUI
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+*.pyc
+Norwegian-for-DiffSinger-DEPENDENCIES/
+NoFA-MFA.pdf
+LOA_TODO

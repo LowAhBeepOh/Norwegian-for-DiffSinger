@@ -23,6 +23,10 @@ This version uses a simplified NOFABET phone set:
 
 The model file (`g2p-nofabet.oudep`) is **not** in this repo. It's attached to the GitHub Releases instead.
 
+## GUI helper
+
+There is also a desktop GUI for preparing voicebank data (transcription, auto-labelling, label conversion and checks). See [README_GUI.md](README_GUI.md).
+
 ## Install (plugin)
 
 1. Download `DiffSingerNorwegian.dll`, `DiffSingerNorwegian.deps.json`, and `g2p-nofabet.oudep` from the latest release.
