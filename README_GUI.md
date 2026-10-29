@@ -58,6 +58,8 @@ your_folder/
 
 Choose the parent folder (`your_folder`) and press **Start auto-labelling**. The TextGrid results go into a new `labels/` folder inside it. Files without a matching pair are skipped and reported in the log.
 
+MFA's own output is printed in the terminal window the app was started from (the one `run_gui.bat` opens), so keep that window visible while it runs. The log inside the GUI only shows the command that was run.
+
 ### Convert Format
 
 Converts TextGrid files to HTK `.lab` files, which is the format DiffSinger uses.

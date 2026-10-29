@@ -11,7 +11,9 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tarfile
+import tempfile
 import urllib.request
 from collections.abc import Callable
 from pathlib import Path
@@ -24,7 +26,6 @@ NOFA_URL = "https://www.nb.no/sbfil/verktoy/nofa/NoFA-1_0.tar.gz"
 NOFA_DIR = TOOLS_DIR / "nofa"
 ACOUSTIC_MODEL = NOFA_DIR / "NoFA_acoustic.zip"
 DICTIONARY = NOFA_DIR / "NoFA-lex.dict"
-CORPUS_STAGE = TOOLS_DIR / "mfa_corpus"
 LABELS_FOLDER = "labels"
 
 
@@ -193,23 +194,40 @@ def align_folder(parent: str | Path, emit: Callable[[str], None]) -> int:
         raise ValueError("No wav/txt pairs with matching names were found.")
 
     conda = _require_conda()
-    shutil.rmtree(CORPUS_STAGE, ignore_errors=True)
-    CORPUS_STAGE.mkdir(parents=True)
+    # MFA names its database after the corpus folder, keeps it under its temporary
+    # directory, and with --clean deletes it before starting. Sharing one name made
+    # every run fight over the same file: if a previous run was still alive (or had
+    # crashed while holding it), --clean failed with WinError 32 "file is in use".
+    # A fresh working directory per run keeps that state private and removable.
+    runs_dir = TOOLS_DIR / "mfa_runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = Path(tempfile.mkdtemp(prefix="align_", dir=runs_dir))
+    corpus_stage = run_dir / "corpus"
+    corpus_stage.mkdir()
+    work_dir = run_dir / "work"
+    work_dir.mkdir()
     output = parent / LABELS_FOLDER
     output.mkdir(exist_ok=True)
     try:
         for wav, text in pairs:
-            shutil.copyfile(wav, CORPUS_STAGE / wav.name)
-            shutil.copyfile(text, CORPUS_STAGE / text.name)
+            shutil.copyfile(wav, corpus_stage / wav.name)
+            shutil.copyfile(text, corpus_stage / text.name)
         emit(f"Aligning {len(pairs)} file(s)...")
+        if sys.stdout is not None:
+            emit(
+                "MFA's output is printed in the terminal window this app was started "
+                "from, not in this log."
+            )
         run_streamed(
             [
                 conda, "run", "-n", MFA_ENV_NAME, "--no-capture-output",
-                "mfa", "align", CORPUS_STAGE, DICTIONARY, ACOUSTIC_MODEL, output, "--clean",
+                "mfa", "align", corpus_stage, DICTIONARY, ACOUSTIC_MODEL, output,
+                "--clean", "--temporary_directory", work_dir,
             ],
             emit,
+            passthrough=True,
         )
     finally:
-        shutil.rmtree(CORPUS_STAGE, ignore_errors=True)
+        shutil.rmtree(run_dir, ignore_errors=True)
     emit(f"Done. TextGrids are in {output}.")
     return len(pairs)

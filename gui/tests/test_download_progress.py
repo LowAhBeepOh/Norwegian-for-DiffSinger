@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -27,6 +28,29 @@ class DownloadProgressTests(unittest.TestCase):
         self.assertIn("100%", lines[-1])
         # Throttled: about one line per 5% rather than one per block.
         self.assertLessEqual(len(lines), 22)
+
+
+class RunStreamedTests(unittest.TestCase):
+    def test_passthrough_sends_output_to_terminal_instead_of_log(self) -> None:
+        lines: list[str] = []
+        process.run_streamed(
+            [sys.executable, "-c", "print('hello')"], lines.append, passthrough=True
+        )
+        # The child's output went straight to stdout; only the command is logged.
+        self.assertEqual(lines, ["$ " + sys.executable + " -c print('hello')"])
+
+    def test_passthrough_still_reports_failure(self) -> None:
+        with self.assertRaises(RuntimeError):
+            process.run_streamed(
+                [sys.executable, "-c", "raise SystemExit(3)"],
+                lambda _: None,
+                passthrough=True,
+            )
+
+    def test_captured_output_still_reaches_the_log(self) -> None:
+        lines: list[str] = []
+        process.run_streamed([sys.executable, "-c", "print('hei')"], lines.append)
+        self.assertIn("hei", lines)
 
 
 if __name__ == "__main__":
