@@ -7,7 +7,7 @@ import sys
 import customtkinter as ctk
 
 from .. import GUI_VERSION, PHONEMIZER_VERSION
-from ..logic import mfa, transcribe
+from ..logic import mfa
 from ..logic.process import run_streamed
 from ..paths import REQUIREMENTS_FILE
 from ..tooltip import add_tip
@@ -39,10 +39,6 @@ GUI_SOURCES: list[tuple[str, str]] = [
         "Model hosting and the transformers library, used to download and run the Whisper models.",
     ),
 ]
-
-# NB-Whisper Small is the model the one-click installer fetches.
-DEFAULT_MODEL_REPO = transcribe.repo_id("NB-Whisper", "small")
-
 
 class AboutTab(ctk.CTkFrame):
     def __init__(self, master: ctk.CTkBaseClass, app: ctk.CTk) -> None:
@@ -88,14 +84,24 @@ class AboutTab(ctk.CTkFrame):
             text="Not set up yet? This installs everything the GUI needs. Each step is skipped "
             "if it's already done.",
         ).pack(anchor="w", padx=10)
+        install_row = ctk.CTkFrame(self, fg_color="transparent")
+        install_row.pack(anchor="w", padx=10, pady=(8, 4))
         install_all = ctk.CTkButton(
-            self, text="Install everything for me", command=self._install_everything
+            install_row, text="Install everything for me", command=self._install_everything
         )
-        install_all.pack(anchor="w", padx=10, pady=(8, 4))
+        install_all.pack(side="left", padx=(0, 8))
+        conda_btn = ctk.CTkButton(install_row, text="Install Miniconda", command=self._install_conda)
+        conda_btn.pack(side="left")
+        add_tip(
+            conda_btn,
+            "Downloads and installs Miniconda for your user account. Needed before MFA. "
+            "Skipped if conda is already installed.",
+        )
         add_tip(
             install_all,
-            "Installs the Python packages, Norwegian MFA with its dictionary, and NB-Whisper "
-            "Small. It's a big download, so it can take a while. Steps that already exist are skipped.",
+            "Installs the Python packages and Norwegian MFA with its dictionary. NB-Whisper is "
+            "not included, since it's about 6 GB. Use 'Install model' on the Transcribe tab. "
+            "Steps that already exist are skipped.",
         )
 
     def _fill_sources(self, parent: ctk.CTkScrollableFrame) -> None:
@@ -119,6 +125,9 @@ class AboutTab(ctk.CTkFrame):
                 text_color=("gray35", "gray70"),
             ).pack(anchor="w", padx=12, pady=(2, 8))
 
+    def _install_conda(self) -> None:
+        self.app.run_task(lambda emit: mfa.install_miniconda(emit))
+
     def _install_everything(self) -> None:
         def job(emit):
             def install_packages() -> None:
@@ -130,13 +139,9 @@ class AboutTab(ctk.CTkFrame):
                 mfa.install_mfa(emit)
                 mfa.install_nofa(emit)
 
-            def install_whisper() -> None:
-                transcribe.install_model(DEFAULT_MODEL_REPO, emit)
-
             steps = [
                 ("Python packages", install_packages),
                 ("Norwegian MFA and dictionary", install_mfa_and_dictionary),
-                ("NB-Whisper Small", install_whisper),
             ]
             failed: list[str] = []
             for name, step in steps:

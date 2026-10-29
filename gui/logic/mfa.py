@@ -8,6 +8,7 @@ Library of Norway under CC0.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tarfile
@@ -16,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ..paths import TOOLS_DIR
-from .process import run_streamed
+from .process import download_file, run_streamed
 
 MFA_ENV_NAME = "nofa-mfa"
 NOFA_URL = "https://www.nb.no/sbfil/verktoy/nofa/NoFA-1_0.tar.gz"
@@ -27,8 +28,61 @@ CORPUS_STAGE = TOOLS_DIR / "mfa_corpus"
 LABELS_FOLDER = "labels"
 
 
+MINICONDA_URL = "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe"
+
+
+def _conda_candidates() -> list[Path]:
+    """Places Miniconda, Miniforge or Anaconda may be installed without being on PATH."""
+    home = Path.home()
+    roots = [
+        home / "miniconda3",
+        home / "miniforge3",
+        home / "anaconda3",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "miniconda3",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "miniforge3",
+        Path(os.environ.get("PROGRAMDATA", "")) / "miniconda3",
+        Path(os.environ.get("PROGRAMDATA", "")) / "miniforge3",
+        Path(os.environ.get("PROGRAMDATA", "")) / "anaconda3",
+    ]
+    exe = "conda.exe" if os.name == "nt" else "conda"
+    candidates = [root / "condabin" / exe for root in roots] + [root / "Scripts" / exe for root in roots]
+    conda_exe = os.environ.get("CONDA_EXE")
+    if conda_exe:
+        candidates.insert(0, Path(conda_exe))
+    return candidates
+
+
 def find_conda() -> str | None:
-    return shutil.which("conda")
+    found = shutil.which("conda")
+    if found:
+        return found
+    for candidate in _conda_candidates():
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def install_miniconda(emit: Callable[[str], None]) -> None:
+    """Download the Miniconda installer and install it for the current user only."""
+    if find_conda() is not None:
+        emit("conda is already installed.")
+        return
+    installer = TOOLS_DIR / "Miniconda3-latest-Windows-x86_64.exe"
+    target = Path.home() / "miniconda3"
+    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        emit(f"Downloading Miniconda from {MINICONDA_URL}")
+        download_file(MINICONDA_URL, installer, emit)
+        emit(f"Installing Miniconda into {target} (this can take a few minutes)...")
+        run_streamed(
+            [installer, "/InstallationType=JustMe", "/RegisterPython=0", "/S", f"/D={target}"],
+            emit,
+        )
+    finally:
+        installer.unlink(missing_ok=True)
+    if find_conda() is None:
+        raise RuntimeError("Miniconda installed, but conda was still not found.")
+    emit("Miniconda installed.")
 
 
 def _conda_env_names(conda: str) -> set[str]:
@@ -98,7 +152,7 @@ def install_nofa(emit: Callable[[str], None]) -> None:
     shutil.rmtree(extract_dir, ignore_errors=True)
     try:
         emit(f"Downloading NoFA (about 25 MB) from {NOFA_URL}")
-        urllib.request.urlretrieve(NOFA_URL, archive_path)
+        download_file(NOFA_URL, archive_path, emit)
         emit("Extracting NoFA...")
         extract_dir.mkdir(parents=True)
         with tarfile.open(archive_path, "r:gz") as archive:

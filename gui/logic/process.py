@@ -3,8 +3,29 @@
 from __future__ import annotations
 
 import subprocess
+import urllib.request
 from collections.abc import Callable, Sequence
 from pathlib import Path
+
+
+def download_file(url: str, destination: Path, emit: Callable[[str], None]) -> None:
+    """Download ``url`` to ``destination``, emitting a progress bar about every 5%."""
+    last_shown = -5
+
+    def report(block_count: int, block_size: int, total_size: int) -> None:
+        nonlocal last_shown
+        if total_size <= 0:
+            return
+        done = min(block_count * block_size, total_size)
+        percent = int(done * 100 / total_size)
+        if percent - last_shown < 5 and done < total_size:
+            return
+        last_shown = percent
+        filled = percent // 5
+        bar = "#" * filled + "-" * (20 - filled)
+        emit(f"[{bar}] {percent:3d}% ({done / 1_048_576:.1f} / {total_size / 1_048_576:.1f} MB)")
+
+    urllib.request.urlretrieve(url, destination, report)
 
 
 def run_streamed(

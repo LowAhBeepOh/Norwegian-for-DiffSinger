@@ -8,7 +8,7 @@ It is separate from the OpenUtau plugin. You don't need the GUI to use the plugi
 
 - **Python 3.10 or newer**, with Python on your PATH.
 - **Conda** (Miniforge or Miniconda). Only needed for Auto Label. MFA is installed in its own conda environment because it depends on Kaldi, which pip can't install.
-- Around 5 GB of free disk space if you install everything (MFA, the NoFA model and NB-Whisper Small).
+- Around 5 GB of free disk space if you install everything (MFA, the NoFA model and NB-Whisper Small). NB-Whisper Small alone is about 6 GB.
 
 ## Install and run
 
@@ -24,7 +24,7 @@ It is separate from the OpenUtau plugin. You don't need the GUI to use the plugi
    python -m gui
    ```
 
-3. Go to the **About** tab and press **Install everything for me**. It installs the Python packages, Norwegian MFA with its dictionary, and NB-Whisper Small. Steps that are already installed are skipped.
+3. Go to the **About** tab and press **Install everything for me**. It installs the Python packages and Norwegian MFA with its dictionary. Steps that are already installed are skipped. NB-Whisper is not included because it's about 6 GB, so install it separately with **Install model** on the **Transcribe** tab.
 
 Every control has a hover tip. Rest the pointer on a button for about a second to see what it does and which folder to choose.
 
