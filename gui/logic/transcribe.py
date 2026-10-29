@@ -35,6 +35,27 @@ FAMILIES: dict[str, dict[str, str]] = {
 }
 
 
+# The model repos also ship ONNX, CTranslate2, GGML, Flax and TensorFlow copies
+# of the weights, plus model cards and training leftovers. Only the files the
+# transformers pipeline reads are downloaded; NB-Whisper Small drops from about
+# 7.4 GB to under 1 GB that way.
+DOWNLOAD_PATTERNS = (
+    "config.json",
+    "generation_config.json",
+    "preprocessor_config.json",
+    "normalizer.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "vocab.json",
+    "merges.txt",
+    "special_tokens_map.json",
+    "added_tokens.json",
+    "model.safetensors",
+    "model-*.safetensors",
+    "*.safetensors.index.json",
+)
+
+
 def repo_id(family: str, size: str) -> str:
     return FAMILIES[family][size]
 
@@ -48,7 +69,7 @@ def is_installed(repo: str) -> bool:
 
 
 def install_model(repo: str, emit: Callable[[str], None]) -> Path:
-    """Download a model snapshot from the Hugging Face Hub."""
+    """Download the files the transformers pipeline needs from the Hub."""
     from huggingface_hub import snapshot_download
 
     target = model_dir(repo)
@@ -56,7 +77,9 @@ def install_model(repo: str, emit: Callable[[str], None]) -> Path:
         emit(f"{repo} is already installed at {target}.")
         return target
     emit(f"Downloading {repo} (this can be several GB)...")
-    snapshot_download(repo_id=repo, local_dir=str(target))
+    snapshot_download(
+        repo_id=repo, local_dir=str(target), allow_patterns=list(DOWNLOAD_PATTERNS)
+    )
     emit(f"Installed {repo} at {target}.")
     return target
 

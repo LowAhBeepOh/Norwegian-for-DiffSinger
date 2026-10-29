@@ -1,3 +1,4 @@
+import fnmatch
 import json
 import tempfile
 import unittest
@@ -82,6 +83,37 @@ class ForceCpuTests(unittest.TestCase):
                     force_cpu=True, pipeline_factory=factory,
                 )
         self.assertTrue(seen["force_cpu"])
+
+    def test_install_model_downloads_only_transformers_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(transcribe, "TOOLS_DIR", Path(tmp)), \
+                 mock.patch("huggingface_hub.snapshot_download") as download:
+                transcribe.install_model("NbAiLab/nb-whisper-small", lambda _: None)
+
+        patterns = download.call_args.kwargs["allow_patterns"]
+        for needed in (
+            "config.json",
+            "preprocessor_config.json",
+            "tokenizer.json",
+            "model.safetensors",
+            "model-00001-of-00002.safetensors",
+        ):
+            self.assertTrue(
+                any(fnmatch.fnmatch(needed, p) for p in patterns), needed
+            )
+        for skipped in (
+            "flax_model.msgpack",
+            "model.bin",
+            "ggml-model.bin",
+            "ggml-model-q5_0.bin",
+            "training_state.bin",
+            "onnx/encoder_model.onnx",
+            "ct2/model.bin",
+            "model.fp32-00001-of-00002.safetensors",
+        ):
+            self.assertFalse(
+                any(fnmatch.fnmatch(skipped, p) for p in patterns), skipped
+            )
 
     def test_default_model_is_nb_whisper_small(self):
         from gui.tabs import transcribe as tab

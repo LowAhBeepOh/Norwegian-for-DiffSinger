@@ -100,7 +100,7 @@ class AboutTab(ctk.CTkFrame):
         add_tip(
             install_all,
             "Installs the Python packages and Norwegian MFA with its dictionary. NB-Whisper is "
-            "not included, since it's about 6 GB. Use 'Install model' on the Transcribe tab. "
+            "not included, since it's about 1 GB. Use 'Install model' on the Transcribe tab. "
             "Steps that already exist are skipped.",
         )
 
