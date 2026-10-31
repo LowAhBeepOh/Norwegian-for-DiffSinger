@@ -90,3 +90,11 @@ This also rewrites `phonemes.txt`. Update `dsdict-no.yaml` to match.
 - **Code**: MIT (see `LICENSE`).
 - **Trained model**: derived from the NST Pronunciation Lexicon for Norwegian Bokmål, distributed by the National Library of Norway under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain dedication). No license restrictions apply to the data, so the model can be redistributed. Credit to the lexicon is appreciated (see `CREDITS.md`).
 - **Phonetisaurus** (BSD 3-Clause) is a related project. This repo doesn't use its code or models.
+
+## AI Transparency
+
+- Claude was used to suggest improvements and additions, as well as check for major bugs and optimizations.
+- AI Overview (Google Search) was used to find out about NB-Whisper and NOFABET. (Only that they existed, NOT for detailed information!)
+- Claude and DeepSeek have contributed to minor code: `gen_nofabet_cs.py`, and all testing scripts for the GUI.
+- Claude and Gemini have contributed to writing some parts of the README files.
+- **Research was not done by any AI**, and neither was writing `CREDITS.md`. The simplified phoneme set was also done without any AI, and **most of the code is still written by a human.**
