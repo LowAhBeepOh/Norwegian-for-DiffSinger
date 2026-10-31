@@ -12,7 +12,6 @@ from ..logic.process import run_streamed
 from ..paths import REQUIREMENTS_FILE
 from ..tooltip import add_tip
 
-# Sources for the GUI and its tools only. The phonemizer and G2P sources are listed in CREDITS.md.
 GUI_SOURCES: list[tuple[str, str]] = [
     (
         "NoFA (Norwegian forced-alignment model and lexicon)",
@@ -40,6 +39,7 @@ GUI_SOURCES: list[tuple[str, str]] = [
     ),
 ]
 
+
 class AboutTab(ctk.CTkFrame):
     def __init__(self, master: ctk.CTkBaseClass, app: ctk.CTk) -> None:
         super().__init__(master, fg_color="transparent")
@@ -57,27 +57,6 @@ class AboutTab(ctk.CTkFrame):
             text=f"GUI version {GUI_VERSION} / phonemizer version {PHONEMIZER_VERSION}",
             text_color=("gray35", "gray70"),
         ).pack(anchor="w", padx=10, pady=(2, 10))
-
-        ctk.CTkLabel(self, text="Sources for the GUI and the tools it uses:").pack(
-            anchor="w", padx=10
-        )
-        sources = ctk.CTkScrollableFrame(self, height=200)
-        sources.pack(fill="x", padx=10, pady=(4, 10))
-        self._fill_sources(sources)
-
-        thanks = ctk.CTkLabel(
-            self,
-            text=(
-                "Also huge thanks to the National Library of Norway (Nasjonalbiblioteket) for "
-                "making this project easier than I originally thought it would be. They've made "
-                "a lot of the things here, like NB-Whisper, NoFAbet, and the word dictionary "
-                "that the G2p was trained on. Love y'all <3"
-            ),
-            wraplength=820,
-            justify="left",
-            anchor="w",
-        )
-        thanks.pack(anchor="w", padx=10, pady=(0, 10))
 
         ctk.CTkLabel(
             self,
@@ -103,6 +82,30 @@ class AboutTab(ctk.CTkFrame):
             "not included, since it's about 1 GB. Use 'Install model' on the Transcribe tab. "
             "Steps that already exist are skipped.",
         )
+        self.app.register_job_button(install_all)
+        self.app.register_job_button(conda_btn)
+
+        thanks = ctk.CTkLabel(
+            self,
+            text=(
+                "Also huge thanks to the National Library of Norway (Nasjonalbiblioteket) for "
+                "making this project easier than I originally thought it would be. They've made "
+                "a lot of the things here, like NB-Whisper, NoFAbet, and the word dictionary "
+                "that the G2p was trained on. Love y'all <3"
+            ),
+            font=ctk.CTkFont(weight="bold"),
+            wraplength=820,
+            justify="left",
+            anchor="w",
+        )
+        thanks.pack(anchor="w", padx=10, pady=(16, 10))
+
+        ctk.CTkLabel(self, text="Sources for the GUI and the tools it uses:").pack(
+            anchor="w", padx=10
+        )
+        sources = ctk.CTkScrollableFrame(self, height=200)
+        sources.pack(fill="x", padx=10, pady=(4, 10))
+        self._fill_sources(sources)
 
     def _fill_sources(self, parent: ctk.CTkScrollableFrame) -> None:
         for title, description in GUI_SOURCES:
@@ -126,18 +129,22 @@ class AboutTab(ctk.CTkFrame):
             ).pack(anchor="w", padx=12, pady=(2, 8))
 
     def _install_conda(self) -> None:
-        self.app.run_task(lambda emit: mfa.install_miniconda(emit))
+        self.app.run_task(
+            lambda task: mfa.install_miniconda(task.emit, should_cancel=task.check)
+        )
 
     def _install_everything(self) -> None:
-        def job(emit):
+        def job(task):
             def install_packages() -> None:
                 run_streamed(
-                    [sys.executable, "-m", "pip", "install", "-r", REQUIREMENTS_FILE], emit
+                    [sys.executable, "-m", "pip", "install", "-r", REQUIREMENTS_FILE],
+                    task.emit,
+                    should_cancel=task.check,
                 )
 
             def install_mfa_and_dictionary() -> None:
-                mfa.install_mfa(emit)
-                mfa.install_nofa(emit)
+                mfa.install_mfa(task.emit, should_cancel=task.check)
+                mfa.install_nofa(task.emit, should_cancel=task.check)
 
             steps = [
                 ("Python packages", install_packages),
@@ -145,15 +152,16 @@ class AboutTab(ctk.CTkFrame):
             ]
             failed: list[str] = []
             for name, step in steps:
-                emit(f"== {name} ==")
+                task.check()
+                task.emit(f"== {name} ==")
                 try:
                     step()
                 except Exception as exc:  # noqa: BLE001 - keep going so one failure doesn't stop the rest
-                    emit(f"ERROR in {name}: {exc}")
+                    task.emit(f"ERROR in {name}: {exc}")
                     failed.append(name)
             if failed:
-                emit("Finished with errors in: " + ", ".join(failed))
+                task.emit("Finished with errors in: " + ", ".join(failed))
             else:
-                emit("Everything is installed.")
+                task.emit("Everything is installed.")
 
         self.app.run_task(job)

@@ -12,7 +12,6 @@ SETTINGS_FILE = TOOLS_DIR / "settings.json"
 
 @dataclass
 class Settings:
-    # None means "follow the operating system"; True/False force light/dark.
     light_mode: bool | None = None
     high_contrast: bool = False
     force_cpu: bool = False

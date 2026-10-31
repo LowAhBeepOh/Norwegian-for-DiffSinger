@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Any
 
-HOVER_DELAY_MS = 850  # the tip appears after roughly 0.85 s of hovering
+HOVER_DELAY_MS = 850
 
 _BG = "#2b2b2b"
 _FG = "#f2f2f2"

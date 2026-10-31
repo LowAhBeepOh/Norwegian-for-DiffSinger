@@ -15,11 +15,8 @@ import customtkinter as ctk
 
 from .settings import Settings
 
-# First installed font wins. "Roboto" is CustomTkinter's current default font.
-# If none of these are installed, the operating system's default font is used.
 PREFERRED_FONTS = ["Inter Tight", "Inter", "Roboto", "Arial"]
 
-# Colours as (light mode, dark mode) pairs, the format CustomTkinter expects.
 HIGH_CONTRAST: dict[str, dict[str, list[str]]] = {
     "CTkButton": {
         "fg_color": ["#0000B0", "#FFD400"],

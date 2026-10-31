@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from tkinter import filedialog
-
 import customtkinter as ctk
 
 from ..logic import label_check
 from ..tooltip import add_tip
+from .common import FolderPicker
 
 
 class CheckLabelsTab(ctk.CTkFrame):
@@ -16,7 +14,6 @@ class CheckLabelsTab(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.pack(fill="both", expand=True)
         self.app = app
-        self.folder: str | None = None
 
         info = ctk.CTkLabel(
             self,
@@ -31,31 +28,31 @@ class CheckLabelsTab(ctk.CTkFrame):
             "alignment mistake. The results are hints, so check them by ear.",
         )
 
-        row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(anchor="w", padx=10, pady=4)
-        choose = ctk.CTkButton(row, text="Choose folder", command=self._choose)
-        choose.pack(side="left", padx=(0, 8))
-        add_tip(choose, "Pick the folder that contains the .lab files to check.")
-        check = ctk.CTkButton(row, text="Check labels", command=self._check)
-        check.pack(side="left")
+        self.picker = FolderPicker(
+            self,
+            button_text="Choose folder",
+            dialog_title="Choose the folder with .lab files",
+            tip="Pick the folder that contains the .lab files to check.",
+        )
+        self.picker.pack(fill="x", padx=10, pady=4)
+
+        check = ctk.CTkButton(self, text="Check labels", command=self._check)
+        check.pack(anchor="w", padx=10, pady=8)
         add_tip(
             check,
             "Scans every .lab in the chosen folder and lists the suspicious labels in the log.",
         )
-
-        self.folder_label = ctk.CTkLabel(self, text="No folder selected")
-        self.folder_label.pack(anchor="w", padx=10, pady=8)
-        add_tip(self.folder_label, "The folder that will be checked.")
-
-    def _choose(self) -> None:
-        folder = filedialog.askdirectory(title="Choose the folder with .lab files")
-        if folder:
-            self.folder = folder
-            self.folder_label.configure(text=folder)
+        self.app.register_job_button(check)
 
     def _check(self) -> None:
-        if not self.folder:
-            self.app.log.write("Choose a folder first.")
+        folder = self.picker.require(self.app)
+        if folder is None:
             return
-        folder = Path(self.folder)
-        self.app.run_task(lambda emit: label_check.check_folder(folder, emit))
+        self.app.run_task(
+            lambda task: label_check.check_folder(
+                folder,
+                task.emit,
+                should_cancel=task.check,
+                progress=task.progress,
+            )
+        )

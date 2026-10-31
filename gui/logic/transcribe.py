@@ -35,10 +35,6 @@ FAMILIES: dict[str, dict[str, str]] = {
 }
 
 
-# The model repos also ship ONNX, CTranslate2, GGML, Flax and TensorFlow copies
-# of the weights, plus model cards and training leftovers. Only the files the
-# transformers pipeline reads are downloaded; NB-Whisper Small drops from about
-# 7.4 GB to under 1 GB that way.
 DOWNLOAD_PATTERNS = (
     "config.json",
     "generation_config.json",
@@ -116,8 +112,16 @@ def transcribe_folder(
     emit: Callable[[str], None],
     force_cpu: bool = False,
     pipeline_factory: Callable[..., Any] = _load_pipeline,
+    *,
+    output_dir: str | Path | None = None,
+    should_cancel: Callable[[], None] | None = None,
+    progress: Callable[[int, int, str | None], None] | None = None,
 ) -> int:
-    """Transcribe every .wav in ``folder`` into a same-named .txt file."""
+    """Transcribe every .wav in ``folder`` into a same-named .txt file.
+
+    The .txt files go into ``output_dir``, which defaults to a ``transcriptions``
+    folder next to ``folder`` (its sibling).
+    """
     folder = Path(folder)
     if not is_installed(repo):
         raise RuntimeError("The model is not installed yet. Click 'Install model' first.")
@@ -125,8 +129,16 @@ def transcribe_folder(
     if not wavs:
         raise ValueError("No .wav files found in that folder.")
 
+    target = Path(output_dir) if output_dir is not None else folder.parent / "transcriptions"
+    target.mkdir(parents=True, exist_ok=True)
+    if progress is not None:
+        progress(0, len(wavs), "Loading the model...")
     asr = pipeline_factory(model_dir(repo), force_cpu=force_cpu)
     for index, wav in enumerate(wavs, 1):
+        if should_cancel is not None:
+            should_cancel()
+        if progress is not None:
+            progress(index - 1, len(wavs), f"Transcribing {index}/{len(wavs)}: {wav.name}")
         emit(f"[{index}/{len(wavs)}] {wav.name}")
         audio = _load_audio(wav)
         output = asr(
@@ -135,6 +147,8 @@ def transcribe_folder(
             generate_kwargs={"language": "norwegian", "task": "transcribe"},
         )
         text = str(output["text"]).strip()
-        wav.with_suffix(".txt").write_text(text + "\n", encoding="utf-8")
+        (target / f"{wav.stem}.txt").write_text(text + "\n", encoding="utf-8")
+    if progress is not None:
+        progress(len(wavs), len(wavs), "Transcription done")
     emit(f"Done. Wrote {len(wavs)} transcription(s).")
     return len(wavs)

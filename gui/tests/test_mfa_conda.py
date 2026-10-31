@@ -28,6 +28,47 @@ class FindCondaTests(unittest.TestCase):
             self.assertIsNone(mfa.find_conda())
 
 
+class EnvCacheTests(unittest.TestCase):
+    def setUp(self) -> None:
+        mfa.clear_env_cache()
+
+    def tearDown(self) -> None:
+        mfa.clear_env_cache()
+
+    def test_env_list_is_cached_between_status_checks(self) -> None:
+        output = '{"envs": ["/home/me/miniconda3/envs/nofa-mfa"]}'
+        with (
+            mock.patch.object(mfa, "find_conda", return_value="conda"),
+            mock.patch.object(
+                mfa.subprocess, "run", return_value=mock.Mock(stdout=output)
+            ) as run,
+        ):
+            self.assertTrue(mfa.is_mfa_installed())
+            self.assertTrue(mfa.is_mfa_installed())
+        self.assertEqual(run.call_count, 1)
+
+    def test_refresh_bypasses_the_cache(self) -> None:
+        output = '{"envs": ["/home/me/miniconda3/envs/nofa-mfa"]}'
+        with (
+            mock.patch.object(mfa, "find_conda", return_value="conda"),
+            mock.patch.object(
+                mfa.subprocess, "run", return_value=mock.Mock(stdout=output)
+            ) as run,
+        ):
+            mfa.is_mfa_installed()
+            mfa.is_mfa_installed(refresh=True)
+        self.assertEqual(run.call_count, 2)
+
+    def test_conda_check_has_a_timeout(self) -> None:
+        with (
+            mock.patch.object(mfa, "find_conda", return_value="conda"),
+            mock.patch.object(mfa.subprocess, "run") as run,
+        ):
+            run.return_value = mock.Mock(stdout='{"envs": []}')
+            mfa.is_mfa_installed()
+        self.assertEqual(run.call_args.kwargs["timeout"], mfa.CONDA_TIMEOUT_SECONDS)
+
+
 class AlignIsolationTests(unittest.TestCase):
     def test_each_run_gets_its_own_mfa_working_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -63,8 +104,8 @@ class AlignIsolationTests(unittest.TestCase):
                 args[args.index("--temporary_directory") + 1] for args in commands
             ]
             self.assertNotEqual(work_dirs[0], work_dirs[1])
-            self.assertIn("--clean", commands[0])
-            # MFA writes to the terminal the app was started from, not the GUI log.
+            self.assertIn("--clean", commands[0])                # MFA writes to the terminal the app was started from, not the GUI log.
+
             self.assertEqual(passthroughs, [True, True])
             # The run's staging and state directories are removed afterwards.
             self.assertEqual(list((root / "tools" / "mfa_runs").iterdir()), [])

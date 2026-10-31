@@ -93,13 +93,13 @@ class PhonemeTests(unittest.TestCase):
 
 class LabelCheckTests(unittest.TestCase):
     def test_flags_short_overlapping_and_zero_length(self) -> None:
-        ms = TICKS_PER_SECOND // 1000  # ticks per millisecond
+        ms = TICKS_PER_SECOND // 1000
         labels = [
             HtkLabel(0, 100 * ms, "a"),
-            HtkLabel(100 * ms, 105 * ms, "b"),  # 5 ms: major
-            HtkLabel(105 * ms, 115 * ms, "c"),  # 10 ms: minor (under 22, not under 10)
-            HtkLabel(110 * ms, 150 * ms, "d"),  # overlaps c
-            HtkLabel(150 * ms, 150 * ms, "e"),  # zero length
+            HtkLabel(100 * ms, 105 * ms, "b"),
+            HtkLabel(105 * ms, 115 * ms, "c"),
+            HtkLabel(110 * ms, 150 * ms, "d"),
+            HtkLabel(150 * ms, 150 * ms, "e"),
         ]
         issues = check_labels(labels, "x.lab")
         reasons = [(i.label, i.severity) for i in issues]
@@ -109,7 +109,7 @@ class LabelCheckTests(unittest.TestCase):
 
     def test_minor_when_between_thresholds(self) -> None:
         ms = TICKS_PER_SECOND // 1000
-        labels = [HtkLabel(0, 15 * ms, "a")]  # 15 ms: under 22 ms but over 10 ms
+        labels = [HtkLabel(0, 15 * ms, "a")]
         issues = check_labels(labels, "x.lab")
         self.assertEqual([(i.label, i.severity) for i in issues], [("a", "minor")])
 

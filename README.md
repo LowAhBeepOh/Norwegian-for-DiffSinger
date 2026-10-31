@@ -2,7 +2,7 @@
 
 A Norwegian G2P and phonemizer for OpenUtau. It turns Norwegian lyrics into phones for DiffSinger voicebanks.
 
-Status: experimental and in-progress. It works, but the output depends a lot on your own voicebank data. I haven't tested it on a decent Norwegian voicebank yet.
+Status: 99% done. It only needs some polish. The whole flow has been tested and works, and making a Norwegian voicebank for DiffSinger was really easy and worked perfectly.
 
 ## What's in here
 
@@ -14,56 +14,56 @@ Status: experimental and in-progress. It works, but the output depends a lot on 
 
 This version uses a simplified NOFABET phone set:
 
-- **No stress or tone markings.** The full NOFABET set has digits on vowels (`AA0`, `AA1`, `AA2`, `AA3`) for stress and tone. Here, every vowel is a single phone (`aa`, `ae`, `ee`, ...).
+- **No stress or tone markings.** Full NOFABET puts digits on vowels (`AA0`, `AA1`, `AA2`, `AA3`) for stress and tone. Here every vowel is a single phone (`aa`, `ae`, `ee`, ...).
 - **51 phones**: 24 vowels and 27 consonants, all lowercase. See `phonemes.txt`.
-- **Retroflex s is kept separate.** The upstream NOFABET docs render it as `SJ`. This set keeps `rs` and `sj` as two phones.
-- **Not in this set**: the upstream extras such as `MX0`, `RX0`, `SX0`, `OU0`, `W`, and `UH0_J`.
+- **Retroflex s is kept separate.** The upstream NOFABET docs write it as `SJ`. This set keeps `rs` and `sj` as two phones.
+- **Not in this set**: the upstream extras like `MX0`, `RX0`, `SX0`, `OU0`, `W` and `UH0_J`.
 
-`dsdict-no.yaml` and the G2P model both use this set. A voicebank only matches it if it was trained on this set. The voicebank’s `phonemes.json` is generated when the model is exported, and it must never be edited by hand. If its names differ from `phonemes.txt`, map the phones with `replacements` in your dictionary instead.
+`dsdict-no.yaml` and the G2P model both use this set. A voicebank only matches it if it was trained on this set. The voicebank's `phonemes.json` is generated when the model is exported, so don't edit it by hand. If its names differ from `phonemes.txt`, map the phones with `replacements` in your dictionary instead.
 
 The model file (`g2p-nofabet.oudep`) is **not** in this repo. It's attached to the GitHub Releases instead.
 
 ## GUI helper
 
-There is also a desktop GUI for preparing voicebank data (transcription, auto-labelling, label conversion and checks). See [README_GUI.md](README_GUI.md).
+There's also a desktop GUI for prepping voicebank data (transcription, auto-labelling, label conversion and checks). See [README_GUI.md](README_GUI.md).
 
 ## Install (plugin)
 
-1. Download `DiffSingerNorwegian.dll`, `DiffSingerNorwegian.deps.json`, and `g2p-nofabet.oudep` from the latest release.
+1. Download `DiffSingerNorwegian.dll`, `DiffSingerNorwegian.deps.json` and `g2p-nofabet.oudep` from the latest release.
 2. Put all three in a folder inside OpenUtau's `Plugins` folder, for example `Plugins\DS_nofabet\`.
-3. If Windows blocks the DLL, right-click it, choose Properties, and tick Unblock.
+3. If Windows blocks the DLL, right-click it, go to Properties and tick Unblock.
 4. Start OpenUtau.
 
 Tested with OpenUtau 0.1.569-beta, which ships ONNX Runtime 1.23.0. The plugin is built against that version too. If your OpenUtau ships a different ONNX Runtime version, the plugin won't load. Rebuild it against your version, or open an issue.
 
 ## Use it in a voicebank
 
-1. Put `dsdict-no.yaml` in the voicebank folder. Copy it into `dsdur` and `dsmain` as well, if your voicebank has those folders.
+1. Put `dsdict-no.yaml` in the voicebank folder. Copy it into `dsdur` and `dsmain` too, if your voicebank has those folders.
 2. Set the phonemizer in `character.yaml`:
    ```yaml
    default_phonemizer: OpenUtau.Core.DiffSinger.DiffSingerNorwegianPhonemizer
    ```
-   Or select `DiffSinger Norwegian Phonemizer` in the singer settings. **Skip changing the phonemizer if you have multiple languages in your voicebank.**
-3. The voicebank’s `phonemes.json` is written during export, describes the phones the model was actually trained on, and must never be edited. Your dictionary has to produce phones that appear in that file. If the model was trained on a different set (for example, with stress digits like `no/AA0`), keep `phonemes.json` as it is and map the phones with `replacements` in your own dictionary. Train on the right Norwegian data before exporting, because a wrong `phonemes.json` can’t be fixed afterwards.
+   Or select `DiffSinger Norwegian Phonemizer` in the singer settings. **Skip this if your voicebank has multiple languages.**
+3. The voicebank's `phonemes.json` is written during export. It describes the phones the model was actually trained on, so don't edit it. Your dictionary has to produce phones that appear in that file. If the model was trained on a different set (say, with stress digits like `no/AA0`), leave `phonemes.json` alone and map the phones with `replacements` in your own dictionary. Train on the right Norwegian data before exporting, because a wrong `phonemes.json` can't be fixed afterwards.
 
-## File Structure for your Voicebank
+## File structure for your voicebank
 
 ```
 YOURverycoolvoicebank/
-├── character.yaml        # default_phonemizer line goes here (unless you have multiple languages, that is!!!)
+├── character.yaml        # default_phonemizer line goes here (unless you have multiple languages!)
 ├── dsdict-no.yaml        # copy from this repo's dsdict-no.yaml
 ├── dsdur/
 │   ├── dsdict-no.yaml    # same file
 │   └── dictionaries/
 ├── dsmain/
 │   ├── dsdict-no.yaml    # same file
-│   └── phonemes.json     # generated by the voicebank export; DO NOT EDIT!!! (hopefully you trained your voicebank on Norwegian)
+│   └── phonemes.json     # generated by the voicebank export; DON'T EDIT (hopefully you trained on Norwegian)
 └── dspitch/
 ```
 
 ## Build from source
 
-The project references `OpenUtau.Core` by relative path (`..\OpenUtau.Core\OpenUtau.Core.csproj`). Place `src/` next to a checkout of OpenUtau's source, or edit that path. It targets `net10.0`.
+The project references `OpenUtau.Core` by relative path (`..\OpenUtau.Core\OpenUtau.Core.csproj`). Put `src/` next to a checkout of OpenUtau's source, or edit that path. It targets `net10.0`.
 
 ```
 dotnet build src/DiffSingerNorwegian.csproj -c Release
@@ -82,7 +82,7 @@ This also rewrites `phonemes.txt`. Update `dsdict-no.yaml` to match.
 ## Limits
 
 - The G2P was trained on a Norwegian pronunciation dictionary of about 600k entries. Words in the dictionary get their listed pronunciation. Anything else is predicted by the model and may be wrong, especially names and new compounds.
-- The model was trained on Norwegian spelling. English lyrics come out with a Norwegian accent. Use an English phonemizer for those.
+- The model was trained on Norwegian spelling, so English lyrics come out with a Norwegian accent. Use an English phonemizer for those.
 - Voicebank quality depends on your own recordings.
 
 ## License

@@ -30,7 +30,6 @@ class ConfigTab(ctk.CTkFrame):
             self.light_mode,
             "Switch between light and dark colours. Applies straight away.",
         )
-        # With no saved choice, show the mode the OS is currently using.
         is_light = app.settings.light_mode
         if is_light is None:
             is_light = ctk.get_appearance_mode() == "Light"

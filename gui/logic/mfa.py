@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-import urllib.request
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -26,10 +26,13 @@ NOFA_URL = "https://www.nb.no/sbfil/verktoy/nofa/NoFA-1_0.tar.gz"
 NOFA_DIR = TOOLS_DIR / "nofa"
 ACOUSTIC_MODEL = NOFA_DIR / "NoFA_acoustic.zip"
 DICTIONARY = NOFA_DIR / "NoFA-lex.dict"
-LABELS_FOLDER = "labels"
+TEXTGRID_FOLDER = "textgrids"
 
 
 MINICONDA_URL = "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe"
+CONDA_TIMEOUT_SECONDS = 30
+ENV_CACHE_SECONDS = 30.0
+_env_cache: dict[str, tuple[float, frozenset[str]]] = {}
 
 
 def _conda_candidates() -> list[Path]:
@@ -63,7 +66,7 @@ def find_conda() -> str | None:
     return None
 
 
-def install_miniconda(emit: Callable[[str], None]) -> None:
+def install_miniconda(emit: Callable[[str], None], should_cancel=None) -> None:
     """Download the Miniconda installer and install it for the current user only."""
     if find_conda() is not None:
         emit("conda is already installed.")
@@ -73,34 +76,51 @@ def install_miniconda(emit: Callable[[str], None]) -> None:
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     try:
         emit(f"Downloading Miniconda from {MINICONDA_URL}")
-        download_file(MINICONDA_URL, installer, emit)
+        download_file(MINICONDA_URL, installer, emit, should_cancel=should_cancel)
         emit(f"Installing Miniconda into {target} (this can take a few minutes)...")
         run_streamed(
             [installer, "/InstallationType=JustMe", "/RegisterPython=0", "/S", f"/D={target}"],
             emit,
+            should_cancel=should_cancel,
         )
     finally:
         installer.unlink(missing_ok=True)
+    clear_env_cache()
     if find_conda() is None:
         raise RuntimeError("Miniconda installed, but conda was still not found.")
     emit("Miniconda installed.")
 
 
-def _conda_env_names(conda: str) -> set[str]:
+def _conda_env_names(conda: str, refresh: bool = False) -> frozenset[str]:
+    now = time.monotonic()
+    cached = _env_cache.get(conda)
+    if cached is not None and not refresh and now - cached[0] < ENV_CACHE_SECONDS:
+        return cached[1]
     result = subprocess.run(
-        [conda, "env", "list", "--json"], capture_output=True, text=True, check=True
+        [conda, "env", "list", "--json"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=CONDA_TIMEOUT_SECONDS,
     )
     paths = json.loads(result.stdout).get("envs", [])
-    return {Path(p).name for p in paths}
+    names = frozenset(Path(p).name for p in paths)
+    _env_cache[conda] = (now, names)
+    return names
 
 
-def is_mfa_installed() -> bool:
+def clear_env_cache() -> None:
+    """Forget cached conda environments, e.g. after installing one."""
+    _env_cache.clear()
+
+
+def is_mfa_installed(refresh: bool = False) -> bool:
     conda = find_conda()
     if conda is None:
         return False
     try:
-        return MFA_ENV_NAME in _conda_env_names(conda)
-    except (OSError, ValueError, RuntimeError):
+        return MFA_ENV_NAME in _conda_env_names(conda, refresh=refresh)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
         return False
 
 
@@ -121,16 +141,18 @@ def _require_conda() -> str:
     return conda
 
 
-def install_mfa(emit: Callable[[str], None]) -> None:
+def install_mfa(emit: Callable[[str], None], should_cancel=None) -> None:
     conda = _require_conda()
-    if MFA_ENV_NAME in _conda_env_names(conda):
+    if MFA_ENV_NAME in _conda_env_names(conda, refresh=True):
         emit(f"Conda environment '{MFA_ENV_NAME}' already exists.")
         return
     emit("Creating conda environment with Montreal Forced Aligner (this can take a while)...")
     run_streamed(
         [conda, "create", "-y", "-n", MFA_ENV_NAME, "-c", "conda-forge", "montreal-forced-aligner"],
         emit,
+        should_cancel=should_cancel,
     )
+    clear_env_cache()
     emit("MFA installed.")
 
 
@@ -143,7 +165,7 @@ def _safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     archive.extractall(destination)
 
 
-def install_nofa(emit: Callable[[str], None]) -> None:
+def install_nofa(emit: Callable[[str], None], should_cancel=None) -> None:
     if is_nofa_installed():
         emit("NoFA model and lexicon are already installed.")
         return
@@ -153,7 +175,9 @@ def install_nofa(emit: Callable[[str], None]) -> None:
     shutil.rmtree(extract_dir, ignore_errors=True)
     try:
         emit(f"Downloading NoFA (about 25 MB) from {NOFA_URL}")
-        download_file(NOFA_URL, archive_path, emit)
+        download_file(NOFA_URL, archive_path, emit, should_cancel=should_cancel)
+        if should_cancel is not None:
+            should_cancel()
         emit("Extracting NoFA...")
         extract_dir.mkdir(parents=True)
         with tarfile.open(archive_path, "r:gz") as archive:
@@ -171,8 +195,8 @@ def install_nofa(emit: Callable[[str], None]) -> None:
         shutil.rmtree(extract_dir, ignore_errors=True)
 
 
-def align_folder(parent: str | Path, emit: Callable[[str], None]) -> int:
-    """Align ``parent/wavs`` and ``parent/transcriptions``; TextGrids go to ``parent/labels``."""
+def align_folder(parent: str | Path, emit: Callable[[str], None], should_cancel=None) -> int:
+    """Align ``parent/wavs`` and ``parent/transcriptions``; TextGrids go to ``parent/textgrids``."""
     parent = Path(parent)
     wavs_dir = parent / "wavs"
     text_dir = parent / "transcriptions"
@@ -194,11 +218,6 @@ def align_folder(parent: str | Path, emit: Callable[[str], None]) -> int:
         raise ValueError("No wav/txt pairs with matching names were found.")
 
     conda = _require_conda()
-    # MFA names its database after the corpus folder, keeps it under its temporary
-    # directory, and with --clean deletes it before starting. Sharing one name made
-    # every run fight over the same file: if a previous run was still alive (or had
-    # crashed while holding it), --clean failed with WinError 32 "file is in use".
-    # A fresh working directory per run keeps that state private and removable.
     runs_dir = TOOLS_DIR / "mfa_runs"
     runs_dir.mkdir(parents=True, exist_ok=True)
     run_dir = Path(tempfile.mkdtemp(prefix="align_", dir=runs_dir))
@@ -206,7 +225,7 @@ def align_folder(parent: str | Path, emit: Callable[[str], None]) -> int:
     corpus_stage.mkdir()
     work_dir = run_dir / "work"
     work_dir.mkdir()
-    output = parent / LABELS_FOLDER
+    output = parent / TEXTGRID_FOLDER
     output.mkdir(exist_ok=True)
     try:
         for wav, text in pairs:
@@ -218,6 +237,9 @@ def align_folder(parent: str | Path, emit: Callable[[str], None]) -> int:
                 "MFA's output is printed in the terminal window this app was started "
                 "from, not in this log."
             )
+        kwargs = {"passthrough": True}
+        if should_cancel is not None:
+            kwargs["should_cancel"] = should_cancel
         run_streamed(
             [
                 conda, "run", "-n", MFA_ENV_NAME, "--no-capture-output",
@@ -225,7 +247,7 @@ def align_folder(parent: str | Path, emit: Callable[[str], None]) -> int:
                 "--clean", "--temporary_directory", work_dir,
             ],
             emit,
-            passthrough=True,
+            **kwargs,
         )
     finally:
         shutil.rmtree(run_dir, ignore_errors=True)

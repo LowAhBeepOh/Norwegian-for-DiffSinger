@@ -18,7 +18,7 @@ class Issue:
     index: int
     time: float
     label: str
-    severity: str  # "minor" or "major"
+    severity: str
     message: str
 
 
@@ -54,13 +54,20 @@ def check_folder(
     emit: Callable[[str], None],
     minor_ms: float = DEFAULT_MINOR_MS,
     major_ms: float = DEFAULT_MAJOR_MS,
+    *,
+    should_cancel: Callable[[], None] | None = None,
+    progress: Callable[[int, int, str | None], None] | None = None,
 ) -> list[Issue]:
     lab_files = sorted(p for p in Path(folder).iterdir() if p.suffix.lower() == ".lab")
     if not lab_files:
         raise ValueError("No .lab files found in that folder.")
 
     all_issues: list[Issue] = []
-    for lab_file in lab_files:
+    for index, lab_file in enumerate(lab_files, 1):
+        if should_cancel is not None:
+            should_cancel()
+        if progress is not None:
+            progress(index - 1, len(lab_files), f"Checking {index}/{len(lab_files)}")
         issues = check_labels(read_htk(lab_file), lab_file.name, minor_ms, major_ms)
         for issue in issues:
             emit(
@@ -69,6 +76,8 @@ def check_folder(
             )
         all_issues.extend(issues)
 
+    if progress is not None:
+        progress(len(lab_files), len(lab_files), "Labels checked")
     majors = sum(1 for i in all_issues if i.severity == "major")
     emit(
         f"Checked {len(lab_files)} files: {majors} major, "
